@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Campus Student Smart Check-in</title>
+    <title>Max Student Smart Check-in</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f5f7fb; color: #333; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 100%; max-width: 400px; position: relative; }
@@ -12,16 +12,17 @@
         label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
         input, select { width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
         input:focus, select:focus { outline: none; border-color: #1967D2; }
-        .time-row { display: table; width: 100%; }
-        .time-col { display: table-cell; width: 48%; }
-        .time-spacer { display: table-cell; width: 4%; text-align: center; vertical-align: middle; font-weight: bold; }
+        .time-row { display: flex; align-items: center; gap: 8px; }
+        .time-col { flex: 1; min-width: 0; }
+        .time-spacer { flex: 0 0 auto; text-align: center; font-weight: bold; }
         button { width: 100%; padding: 12px; background-color: #1967D2; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         button:hover { background-color: #1557b5; }
         button:disabled { background-color: #ccc; cursor: not-allowed; }
-        #statusMessage { margin-top: 15px; padding: 10px; border-radius: 6px; text-align: center; font-size: 14px; display: none; }
-        .success { background-color: #e6f4ea; color: #137333; }
-        .error { background-color: #fce8e6; color: #c5221f; }
+        #statusMessage { margin-top: 15px; padding: 12px; border-radius: 8px; text-align: center; font-size: 14px; display: none; }
+        .success { background-color: #137333; color: #ffffff; font-size: 18px; font-weight: 800; padding: 16px; box-shadow: 0 4px 14px rgba(19,115,51,0.35); animation: popIn 0.35s ease; }
+        .error { background-color: #fce8e6; color: #c5221f; font-weight: 700; }
         .loading { text-align: center; color: #666; font-size: 14px; }
+        @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         
         /* 【弹窗按钮强制同行修复版 CSS】 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
@@ -41,9 +42,9 @@
 <body>
 
 <div class="card">
-    <h2>English Class Verification</h2>
+    <h2>English Class Check-in</h2>
     
-    <div id="loadingBox" class="loading">Initializing system data, please wait...</div>
+    <div id="loadingBox" class="loading">Loading classes, please wait...</div>
 
     <form id="checkinForm" style="display: none;" onsubmit="triggerSubmissionProcess(event)">
         <div class="form-group">
@@ -76,7 +77,7 @@
             </div>
         </div>
 
-        <button type="submit" id="submitBtn">Verify & Submit</button>
+        <button type="submit" id="submitBtn">Check In</button>
     </form>
 
     <div id="statusMessage"></div>
@@ -84,8 +85,8 @@
 
 <div class="modal-overlay" id="confirmModal">
     <div class="modal-box">
-        <h3>⚠️ Double Check Your Info</h3>
-        <p style="font-size:13px; color:#666; text-align: center;">Your identity details are updated. Please ensure your class selection is correct!</p>
+        <h3>⚠️ Confirm Your Details</h3>
+        <p style="font-size:13px; color:#666; text-align: center;">Please confirm your information is correct before submitting.</p>
         <div class="modal-info-list">
             <div>• Class: <strong id="mClass"></strong></div>
             <div>• Name: <span id="mName"></span></div>
@@ -93,8 +94,8 @@
             <div>• Duration: <span id="mTime"></span></div>
         </div>
         <div class="modal-buttons">
-            <button class="modal-btn btn-cancel" onclick="closeModal()">Cancel & Fix</button>
-            <button class="modal-btn btn-confirm" onclick="executeFinalUpload()">Confirm</button>
+            <button class="modal-btn btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="modal-btn btn-confirm" onclick="executeFinalUpload()">Confirm Check-in</button>
             <div class="modal-clear"></div>
         </div>
     </div>
@@ -193,7 +194,7 @@
     function triggerSubmissionProcess(event) {
         event.preventDefault();
         const submitBtn = document.getElementById('submitBtn');
-        showStatus("Verifying your live GPS geolocation...", "loading");
+        showStatus("Verifying your live GPS location...", "loading");
         submitBtn.disabled = true;
 
         const arrTime = document.getElementById('arrivalTime').value;
@@ -218,7 +219,7 @@
                 const distance = calculateDistance(userLat, userLon, TARGET_LAT, TARGET_LON);
                 
                 if (distance > ALLOWED_DISTANCE_KM) {
-                    showStatus("Verification Failed: You are outside the authorized boundary.", "error");
+                    showStatus("Check-in Failed: You are outside the authorized area.", "error");
                     submitBtn.disabled = false;
                     return;
                 }
@@ -252,7 +253,7 @@
                     document.getElementById('mId').innerText = pendingPayload.studentId;
                     document.getElementById('mTime').innerText = pendingPayload.timeDuration;
                     document.getElementById('confirmModal').style.display = 'flex';
-                    showStatus("Awaiting local verification check...", "loading");
+                    showStatus("Awaiting your confirmation...", "loading");
                 } else {
                     executeFinalUpload();
                 }
@@ -267,7 +268,7 @@
 
     function executeFinalUpload() {
         closeModal();
-        showStatus("Syncing attendance record safely to cloud storage...", "loading");
+        showStatus("Checking in...", "loading");
 
         fetch(MASTER_API_URL, {
             method: 'POST',
@@ -276,7 +277,7 @@
             body: JSON.stringify(pendingPayload)
         })
         .then(() => {
-            showStatus("🎉 Check-in Successful! Record successfully uploaded.", "success");
+            showStatus("✅ Check-in Successful!", "success");
             
             localStorage.setItem('cached_class', pendingPayload.className);
             localStorage.setItem('cached_name', pendingPayload.studentName);
@@ -310,6 +311,5 @@
         }
     }
 </script>
-
 </body>
 </html>
