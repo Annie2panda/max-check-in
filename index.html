@@ -13,7 +13,9 @@
         input, select { width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
         input:focus, select:focus { outline: none; border-color: #1967D2; }
         .time-row { display: flex; align-items: center; gap: 8px; }
-        .time-col { flex: 1; min-width: 0; }
+        .time-col { flex: 1 1 0; min-width: 0; }
+        .time-col input { min-width: 0; width: 100%; -webkit-appearance: none; appearance: none; }
+        .time-col input::-webkit-calendar-picker-indicator { margin: 0; }
         .time-spacer { flex: 0 0 auto; text-align: center; font-weight: bold; }
         button { width: 100%; padding: 12px; background-color: #1967D2; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         button:hover { background-color: #1557b5; }
@@ -24,12 +26,17 @@
         .loading { text-align: center; color: #666; font-size: 14px; }
         @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         
-        /* 移动端：压缩时间框，避免遮挡 "to" */
+        /* 移动端：压缩时间框，避免遮挡 "to" 与超出卡片 */
         @media (max-width: 480px) {
             .card { padding: 20px; }
             .time-row { gap: 6px; }
-            .time-col input { font-size: 14px; padding: 8px 4px; }
-            .time-spacer { font-size: 13px; padding: 0 2px; }
+            .time-col input { font-size: 14px; padding: 8px 2px; }
+            .time-spacer { font-size: 13px; padding: 0 1px; }
+        }
+        @media (max-width: 360px) {
+            .time-row { gap: 4px; }
+            .time-col input { font-size: 13px; padding: 7px 1px; }
+            .time-spacer { font-size: 12px; }
         }
         
         /* 【弹窗按钮强制同行修复版 CSS】 */
