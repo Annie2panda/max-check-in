@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Max Student Smart Check-in</title>
+    <title>Class Check-in</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f5f7fb; color: #333; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 100%; max-width: 400px; position: relative; }
@@ -23,6 +23,14 @@
         .error { background-color: #fce8e6; color: #c5221f; font-weight: 700; }
         .loading { text-align: center; color: #666; font-size: 14px; }
         @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        
+        /* 移动端：压缩时间框，避免遮挡 "to" */
+        @media (max-width: 480px) {
+            .card { padding: 20px; }
+            .time-row { gap: 6px; }
+            .time-col input { font-size: 14px; padding: 8px 4px; }
+            .time-spacer { font-size: 13px; padding: 0 2px; }
+        }
         
         /* 【弹窗按钮强制同行修复版 CSS】 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
@@ -48,24 +56,24 @@
 
     <form id="checkinForm" style="display: none;" onsubmit="triggerSubmissionProcess(event)">
         <div class="form-group">
-            <label for="className">Select Your Class</label>
+            <label for="className">Class</label>
             <select id="className" required>
-                <option value="">-- Choose Class --</option>
+                <option value="">-- Select Class --</option>
             </select>
         </div>
 
         <div class="form-group">
-            <label for="studentName">Full Name</label>
-            <input type="text" id="studentName" placeholder="e.g. John Doe" required>
+            <label for="studentName">Name</label>
+            <input type="text" id="studentName" placeholder="e.g. John Smith" required>
         </div>
 
         <div class="form-group">
             <label for="studentId">Student ID</label>
-            <input type="text" id="studentId" placeholder="e.g. U20261234" required>
+            <input type="text" id="studentId" placeholder="e.g. MAX20261234" required>
         </div>
 
         <div class="form-group">
-            <label>Study Attendance Duration</label>
+            <label>Attendance Time</label>
             <div class="time-row">
                 <div class="time-col">
                     <input type="time" id="arrivalTime" required>
@@ -91,7 +99,7 @@
             <div>• Class: <strong id="mClass"></strong></div>
             <div>• Name: <span id="mName"></span></div>
             <div>• Student ID: <span id="mId"></span></div>
-            <div>• Duration: <span id="mTime"></span></div>
+            <div>• Time: <span id="mTime"></span></div>
         </div>
         <div class="modal-buttons">
             <button class="modal-btn btn-cancel" onclick="closeModal()">Cancel</button>
@@ -148,12 +156,12 @@
                         restoreCachedForm();
                     }
                 } else if (!cachedLinks) {
-                    showStatus(data.message || "Error: Failed to retrieve configuration.", "error");
+                    showStatus(data.message || "Failed to load class list. Please refresh.", "error");
                 }
             })
             .catch(err => {
                 if (!cachedLinks) {
-                    showStatus("Network Error: Failed to connect to server. Ensure URL is correct.", "error");
+                    showStatus("Network error. Couldn't connect to the Internet. Please try again.", "error");
                 }
             });
     });
@@ -162,7 +170,7 @@
     function renderClassSelect(links) {
         const selectEl = document.getElementById('className');
         // 先清空除第一项外的旧选项
-        selectEl.innerHTML = '<option value="">-- Choose Class --</option>';
+        selectEl.innerHTML = '<option value="">-- Select Class --</option>';
         Object.keys(links).forEach(cls => {
             const opt = document.createElement('option');
             opt.value = cls;
@@ -201,13 +209,13 @@
         const depTime = document.getElementById('departureTime').value;
 
         if (arrTime >= depTime) {
-            showStatus("Validation Error: Departure time must be later than arrival time!", "error");
+            showStatus("Departure time must be later than arrival time.", "error");
             submitBtn.disabled = false;
             return;
         }
 
         if (!navigator.geolocation) {
-            showStatus("Error: Geolocation services are not supported by your browser.", "error");
+            showStatus("Your browser doesn't support location services.", "error");
             submitBtn.disabled = false;
             return;
         }
@@ -219,7 +227,7 @@
                 const distance = calculateDistance(userLat, userLon, TARGET_LAT, TARGET_LON);
                 
                 if (distance > ALLOWED_DISTANCE_KM) {
-                    showStatus("Check-in Failed: You are outside the authorized area.", "error");
+                    showStatus("You're outside the allowed check-in area.", "error");
                     submitBtn.disabled = false;
                     return;
                 }
@@ -228,7 +236,7 @@
                 const targetSheetUrl = globalClassLinks[selectedClass];
 
                 if (!targetSheetUrl) {
-                    showStatus("Error: Target URL routing for this class is missing.", "error");
+                    showStatus("Class configuration is missing. Please contact admin.", "error");
                     submitBtn.disabled = false;
                     return;
                 }
@@ -259,7 +267,7 @@
                 }
             },
             (error) => {
-                showStatus("Error: Location access denied. Please enable GPS permissions.", "error");
+                showStatus("Location access denied. Please enable GPS and retry.", "error");
                 submitBtn.disabled = false;
             },
             { enableHighAccuracy: true, timeout: 10000 }
@@ -288,7 +296,7 @@
             document.getElementById('submitBtn').disabled = false;
         })
         .catch(err => {
-            showStatus("Transmission Error: Failed to sync data. Please check internet.", "error");
+            showStatus("Check-in failed to sync. Please check your Internet and refresh.", "error");
             document.getElementById('submitBtn').disabled = false;
         });
     }
