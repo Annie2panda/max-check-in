@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Student Smart Check-in</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f5f7fb; color: #333; padding: 20px; display: flex; justify-content: center; }
+        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 100%; max-width: 400px; position: relative; }
+        h2 { text-align: center; color: #1967D2; margin-bottom: 25px; font-size: 22px; }
+        .form-group { margin-bottom: 18px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+        input:focus, select:focus { outline: none; border-color: #1967D2; }
+        .time-row { display: table; width: 100%; }
+        .time-col { display: table-cell; width: 48%; }
+        .time-spacer { display: table-cell; width: 4%; text-align: center; vertical-align: middle; font-weight: bold; }
+        button { width: 100%; padding: 12px; background-color: #1967D2; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        button:hover { background-color: #1557b5; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #statusMessage { margin-top: 15px; padding: 10px; border-radius: 6px; text-align: center; font-size: 14px; display: none; }
+        .success { background-color: #e6f4ea; color: #137333; }
+        .error { background-color: #fce8e6; color: #c5221f; }
+        .loading { text-align: center; color: #666; font-size: 14px; }
+        
+        /* 【弹窗按钮强制同行修复版 CSS】 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-box { background: white; padding: 25px; border-radius: 10px; max-width: 340px; width: 90%; text-align: left; box-sizing: border-box; }
+        .modal-box h3 { margin-top: 0; color: #d93025; font-size: 18px; text-align: center; }
+        .modal-info-list { margin: 15px 0; background: #f8f9fa; padding: 12px; border-radius: 6px; font-size: 14px; line-height: 1.6; }
+        .modal-info-list strong { color: #1967D2; }
+        
+        /* 采用稳定的左右浮动流，完美规避单元格挤压变形换行 */
+        .modal-buttons { width: 100%; margin-top: 20px; clear: both; }
+        .modal-btn { width: 46%; padding: 10px 0; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; text-align: center; border: none; }
+        .btn-cancel { background: #e0e0e0; color: #333; float: left; }
+        .btn-confirm { background: #1967D2; color: white; float: right; }
+        .modal-clear { clear: both; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>English Class Verification</h2>
+    
+    <div id="loadingBox" class="loading">Initializing system data, please wait...</div>
+
+    <form id="checkinForm" style="display: none;" onsubmit="triggerSubmissionProcess(event)">
+        <div class="form-group">
+            <label for="className">Select Your Class</label>
+            <select id="className" required>
+                <option value="">-- Choose Class --</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="studentName">Full Name</label>
+            <input type="text" id="studentName" placeholder="e.g. John Doe" required>
+        </div>
+
+        <div class="form-group">
+            <label for="studentId">Student ID</label>
+            <input type="text" id="studentId" placeholder="e.g. U20261234" required>
+        </div>
+
+        <div class="form-group">
+            <label>Study Attendance Duration</label>
+            <div class="time-row">
+                <div class="time-col">
+                    <input type="time" id="arrivalTime" required>
+                </div>
+                <div class="time-spacer">to</div>
+                <div class="time-col">
+                    <input type="time" id="departureTime" required>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" id="submitBtn">Verify & Submit</button>
+    </form>
+
+    <div id="statusMessage"></div>
+</div>
+
+<div class="modal-overlay" id="confirmModal">
+    <div class="modal-box">
+        <h3>⚠️ Double Check Your Info</h3>
+        <p style="font-size:13px; color:#666; text-align: center;">Your identity details are updated. Please ensure your class selection is correct!</p>
+        <div class="modal-info-list">
+            <div>• Class: <strong id="mClass"></strong></div>
+            <div>• Name: <span id="mName"></span></div>
+            <div>• Student ID: <span id="mId"></span></div>
+            <div>• Duration: <span id="mTime"></span></div>
+        </div>
+        <div class="modal-buttons">
+            <button class="modal-btn btn-cancel" onclick="closeModal()">Cancel & Fix</button>
+            <button class="modal-btn btn-confirm" onclick="executeFinalUpload()">Confirm</button>
+            <div class="modal-clear"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 将此处替换为您在 Google Apps Script 中重新发布获得的最新 Web App 链接
+    const MASTER_API_URL = "https://script.google.com/macros/s/AKfycbxBP1NI9EZE0AH_3CIi3Vuaq9OTPdWwBQScB-19RPEFVj6mDaF-PkR3xTqlkB4tHeipiQ/exec"; 
+    
+    const TARGET_LAT = -34.4258585; 
+    const TARGET_LON = 150.8892802; 
+    const ALLOWED_DISTANCE_KM = 4.05; 
+
+    let globalClassLinks = {}; 
+    let pendingPayload = null; 
+
+    // 【极速初始化逻辑】
+    window.addEventListener('DOMContentLoaded', () => {
+        // 尝试从浏览器本地缓存读取班级列表
+        const cachedLinks = localStorage.getItem('master_class_links');
+        
+        if (cachedLinks) {
+            try {
+                globalClassLinks = JSON.parse(cachedLinks);
+                renderClassSelect(globalClassLinks);
+                // 只要有缓存，立刻对学生可见，实现零延迟“秒开”
+                document.getElementById('loadingBox').style.display = 'none';
+                document.getElementById('checkinForm').style.display = 'block';
+                // 恢复上一次的填表记忆
+                restoreCachedForm();
+            } catch(e) {
+                console.error("Cache parse error, falling back to network.");
+            }
+        }
+
+        // 后台静默加载/更新数据，完全不卡顿学生当前的操作视角
+        fetch(MASTER_API_URL)
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === "success") {
+                    globalClassLinks = data.classLinks;
+                    // 更新本地缓存，供下一次或刷新后使用
+                    localStorage.setItem('master_class_links', JSON.stringify(globalClassLinks));
+                    
+                    // 如果刚才没有缓存（第一次打开），此时再渲染并展示
+                    if (!cachedLinks) {
+                        renderClassSelect(globalClassLinks);
+                        document.getElementById('loadingBox').style.display = 'none';
+                        document.getElementById('checkinForm').style.display = 'block';
+                        restoreCachedForm();
+                    }
+                } else if (!cachedLinks) {
+                    showStatus(data.message || "Error: Failed to retrieve configuration.", "error");
+                }
+            })
+            .catch(err => {
+                if (!cachedLinks) {
+                    showStatus("Network Error: Failed to connect to server. Ensure URL is correct.", "error");
+                }
+            });
+    });
+
+    // 提取出来的公共渲染班级下拉框函数
+    function renderClassSelect(links) {
+        const selectEl = document.getElementById('className');
+        // 先清空除第一项外的旧选项
+        selectEl.innerHTML = '<option value="">-- Choose Class --</option>';
+        Object.keys(links).forEach(cls => {
+            const opt = document.createElement('option');
+            opt.value = cls;
+            opt.textContent = "Class " + cls;
+            selectEl.appendChild(opt);
+        });
+    }
+
+    // 提取出来的公共回填表单记忆函数
+    function restoreCachedForm() {
+        const cachedClass = localStorage.getItem('cached_class');
+        const cachedName = localStorage.getItem('cached_name');
+        const cachedId = localStorage.getItem('cached_id');
+        if (cachedClass && globalClassLinks[cachedClass]) document.getElementById('className').value = cachedClass;
+        if (cachedName) document.getElementById('studentName').value = cachedName;
+        if (cachedId) document.getElementById('studentId').value = cachedId;
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))); 
+    }
+
+    function triggerSubmissionProcess(event) {
+        event.preventDefault();
+        const submitBtn = document.getElementById('submitBtn');
+        showStatus("Verifying your live GPS geolocation...", "loading");
+        submitBtn.disabled = true;
+
+        const arrTime = document.getElementById('arrivalTime').value;
+        const depTime = document.getElementById('departureTime').value;
+
+        if (arrTime >= depTime) {
+            showStatus("Validation Error: Departure time must be later than arrival time!", "error");
+            submitBtn.disabled = false;
+            return;
+        }
+
+        if (!navigator.geolocation) {
+            showStatus("Error: Geolocation services are not supported by your browser.", "error");
+            submitBtn.disabled = false;
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const userLat = position.coords.latitude;
+                const userLon = position.coords.longitude;
+                const distance = calculateDistance(userLat, userLon, TARGET_LAT, TARGET_LON);
+                
+                if (distance > ALLOWED_DISTANCE_KM) {
+                    showStatus("Verification Failed: You are outside the authorized boundary.", "error");
+                    submitBtn.disabled = false;
+                    return;
+                }
+
+                const selectedClass = document.getElementById('className').value;
+                const targetSheetUrl = globalClassLinks[selectedClass];
+
+                if (!targetSheetUrl) {
+                    showStatus("Error: Target URL routing for this class is missing.", "error");
+                    submitBtn.disabled = false;
+                    return;
+                }
+
+                pendingPayload = {
+                    className: selectedClass,
+                    targetUrl: targetSheetUrl,
+                    studentName: document.getElementById('studentName').value.trim(),
+                    studentId: document.getElementById('studentId').value.trim(),
+                    timeDuration: `${arrTime} - ${depTime}`,
+                    latitude: userLat,
+                    longitude: userLon
+                };
+
+                const isIdentityChanged = localStorage.getItem('cached_class') !== pendingPayload.className ||
+                                          localStorage.getItem('cached_name') !== pendingPayload.studentName ||
+                                          localStorage.getItem('cached_id') !== pendingPayload.studentId;
+
+                if (isIdentityChanged) {
+                    document.getElementById('mClass').innerText = pendingPayload.className;
+                    document.getElementById('mName').innerText = pendingPayload.studentName;
+                    document.getElementById('mId').innerText = pendingPayload.studentId;
+                    document.getElementById('mTime').innerText = pendingPayload.timeDuration;
+                    document.getElementById('confirmModal').style.display = 'flex';
+                    showStatus("Awaiting local verification check...", "loading");
+                } else {
+                    executeFinalUpload();
+                }
+            },
+            (error) => {
+                showStatus("Error: Location access denied. Please enable GPS permissions.", "error");
+                submitBtn.disabled = false;
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+
+    function executeFinalUpload() {
+        closeModal();
+        showStatus("Syncing attendance record safely to cloud storage...", "loading");
+
+        fetch(MASTER_API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pendingPayload)
+        })
+        .then(() => {
+            showStatus("🎉 Check-in Successful! Record successfully uploaded.", "success");
+            
+            localStorage.setItem('cached_class', pendingPayload.className);
+            localStorage.setItem('cached_name', pendingPayload.studentName);
+            localStorage.setItem('cached_id', pendingPayload.studentId);
+            
+            document.getElementById('arrivalTime').value = '';
+            document.getElementById('departureTime').value = '';
+            document.getElementById('submitBtn').disabled = false;
+        })
+        .catch(err => {
+            showStatus("Transmission Error: Failed to sync data. Please check internet.", "error");
+            document.getElementById('submitBtn').disabled = false;
+        });
+    }
+
+    function closeModal() {
+        document.getElementById('confirmModal').style.display = 'none';
+        document.getElementById('submitBtn').disabled = false;
+    }
+
+    function showStatus(msg, type) {
+        const msgEl = document.getElementById('statusMessage');
+        msgEl.style.display = 'block';
+        msgEl.innerText = msg;
+        msgEl.className = '';
+        if (type === "success") msgEl.classList.add('success');
+        if (type === "error") msgEl.classList.add('error');
+        if (type === "loading") {
+            msgEl.style.backgroundColor = '#e8f0fe';
+            msgEl.style.color = '#1967d2';
+        }
+    }
+</script>
+
+</body>
+</html>
