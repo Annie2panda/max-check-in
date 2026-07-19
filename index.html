@@ -26,7 +26,7 @@
         .loading { text-align: center; color: #666; font-size: 14px; }
         @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         
-        /* 移动端：压缩时间框，避免遮挡 "to" 与超出卡片 */
+        /* 移动端优化 */
         @media (max-width: 480px) {
             .card { padding: 20px; }            
             select { height: 41px; padding: 0 10px; box-sizing: border-box; }
@@ -36,18 +36,17 @@
         }
         @media (max-width: 360px) {
             .time-row { gap: 4px; }
-            .time-col input { font-size: 13px; padding: 11px 3px; height: 38px; line-height: 1; box-sizing: border-box; }
+            .time-col input { font-size: 13px; padding: 17px 3px; height: 38px; line-height: 1; box-sizing: border-box; }
             .time-spacer { font-size: 12px; }
         }
         
-        /* 【弹窗按钮强制同行修复版 CSS】 */
+        /* 弹窗样式 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-box { background: white; padding: 25px; border-radius: 10px; max-width: 340px; width: 90%; text-align: left; box-sizing: border-box; }
         .modal-box h3 { margin-top: 0; color: #d93025; font-size: 18px; text-align: center; }
         .modal-info-list { margin: 15px 0; background: #f8f9fa; padding: 12px; border-radius: 6px; font-size: 14px; line-height: 1.6; }
         .modal-info-list strong { color: #1967D2; }
         
-        /* 采用稳定的左右浮动流，完美规避单元格挤压变形换行 */
         .modal-buttons { width: 100%; margin-top: 20px; clear: both; }
         .modal-btn { width: 46%; padding: 10px 0; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; text-align: center; border: none; }
         .btn-cancel { background: #e0e0e0; color: #333; float: left; }
@@ -110,7 +109,7 @@
             <div>• Time: <span id="mTime"></span></div>
         </div>
         <div class="modal-buttons">
-            <button class="modal-btn btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="modal-btn btn-cancel" onclick="closeModal(true)">Cancel</button>
             <button class="modal-btn btn-confirm" onclick="executeFinalUpload()">Confirm Check-in</button>
             <div class="modal-clear"></div>
         </div>
@@ -118,7 +117,6 @@
 </div>
 
 <script>
-    // 将此处替换为您在 Google Apps Script 中重新发布获得的最新 Web App 链接
     const MASTER_API_URL = "https://script.google.com/macros/s/AKfycbxBP1NI9EZE0AH_3CIi3Vuaq9OTPdWwBQScB-19RPEFVj6mDaF-PkR3xTqlkB4tHeipiQ/exec"; 
     
     const TARGET_LAT = -34.4258585; 
@@ -128,35 +126,28 @@
     let globalClassLinks = {}; 
     let pendingPayload = null; 
 
-    // 【极速初始化逻辑】
     window.addEventListener('DOMContentLoaded', () => {
-        // 尝试从浏览器本地缓存读取班级列表
         const cachedLinks = localStorage.getItem('master_class_links');
         
         if (cachedLinks) {
             try {
                 globalClassLinks = JSON.parse(cachedLinks);
                 renderClassSelect(globalClassLinks);
-                // 只要有缓存，立刻对学生可见，实现零延迟“秒开”
                 document.getElementById('loadingBox').style.display = 'none';
                 document.getElementById('checkinForm').style.display = 'block';
-                // 恢复上一次的填表记忆
                 restoreCachedForm();
             } catch(e) {
-                console.error("Cache parse error, falling back to network.");
+                console.error("Cache load skipped.");
             }
         }
 
-        // 后台静默加载/更新数据，完全不卡顿学生当前的操作视角
         fetch(MASTER_API_URL)
             .then(res => res.json())
             .then(data => {
                 if(data.status === "success") {
                     globalClassLinks = data.classLinks;
-                    // 更新本地缓存，供下一次或刷新后使用
                     localStorage.setItem('master_class_links', JSON.stringify(globalClassLinks));
                     
-                    // 如果刚才没有缓存（第一次打开），此时再渲染并展示
                     if (!cachedLinks) {
                         renderClassSelect(globalClassLinks);
                         document.getElementById('loadingBox').style.display = 'none';
@@ -164,20 +155,18 @@
                         restoreCachedForm();
                     }
                 } else if (!cachedLinks) {
-                    showStatus(data.message || "Failed to load class list. Please refresh.", "error");
+                    showStatus(data.message || "Failed to load class list. Please refresh the page.", "error");
                 }
             })
             .catch(err => {
                 if (!cachedLinks) {
-                    showStatus("Network error. Couldn't connect to the Internet. Please try again.", "error");
+                    showStatus("Network error. Please check your Internet and refresh the page.", "error");
                 }
             });
     });
 
-    // 提取出来的公共渲染班级下拉框函数
     function renderClassSelect(links) {
         const selectEl = document.getElementById('className');
-        // 先清空除第一项外的旧选项
         selectEl.innerHTML = '<option value="">-- Select Class --</option>';
         Object.keys(links).forEach(cls => {
             const opt = document.createElement('option');
@@ -187,7 +176,6 @@
         });
     }
 
-    // 提取出来的公共回填表单记忆函数
     function restoreCachedForm() {
         const cachedClass = localStorage.getItem('cached_class');
         const cachedName = localStorage.getItem('cached_name');
@@ -223,7 +211,7 @@
         }
 
         if (!navigator.geolocation) {
-            showStatus("Your browser doesn't support location services.", "error");
+            showStatus("Your browser doesn't support location services. Please switch browser.", "error");
             submitBtn.disabled = false;
             return;
         }
@@ -244,7 +232,7 @@
                 const targetSheetUrl = globalClassLinks[selectedClass];
 
                 if (!targetSheetUrl) {
-                    showStatus("Class configuration is missing. Please contact admin.", "error");
+                    showStatus("Class configuration is missing. Please contact your teacher or admin.", "error");
                     submitBtn.disabled = false;
                     return;
                 }
@@ -275,7 +263,7 @@
                 }
             },
             (error) => {
-                showStatus("Location access denied. Please enable GPS and retry.", "error");
+                showStatus("Location access denied. Please enable GPS permission for your browser and retry.", "error");
                 submitBtn.disabled = false;
             },
             { enableHighAccuracy: true, timeout: 10000 }
@@ -283,42 +271,57 @@
     }
 
     function executeFinalUpload() {
-        closeModal();
+        closeModal(false); 
         showStatus("Checking in...", "loading");
 
         fetch(MASTER_API_URL, {
             method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' }, 
             body: JSON.stringify(pendingPayload)
         })
-        .then(() => {
-            showStatus("✅ Check-in Successful!", "success");
-            
-            localStorage.setItem('cached_class', pendingPayload.className);
-            localStorage.setItem('cached_name', pendingPayload.studentName);
-            localStorage.setItem('cached_id', pendingPayload.studentId);
-            
-            document.getElementById('arrivalTime').value = '';
-            document.getElementById('departureTime').value = '';
+        .then(res => {
+            if (!res.ok) throw new Error("Network error");
+            return res.json();
+        })
+        .then(resData => {
+            if (resData.status === "success") {
+                showStatus("✅ Check-in Successful!", "success");
+                
+                localStorage.setItem('cached_class', pendingPayload.className);
+                localStorage.setItem('cached_name', pendingPayload.studentName);
+                localStorage.setItem('cached_id', pendingPayload.studentId);
+                
+                document.getElementById('arrivalTime').value = '';
+                document.getElementById('departureTime').value = '';
+            } else {
+                showStatus("Check-in failed: " + (resData.message || "Invalid configuration. Please contact your teacher."), "error");
+            }
             document.getElementById('submitBtn').disabled = false;
         })
         .catch(err => {
-            showStatus("Check-in failed to sync. Please check your Internet and refresh.", "error");
+            showStatus("Check-in failed. Please check your Internet connection, refresh and try again.", "error");
             document.getElementById('submitBtn').disabled = false;
         });
     }
 
-    function closeModal() {
+    function closeModal(isUserCancelled = false) {
         document.getElementById('confirmModal').style.display = 'none';
         document.getElementById('submitBtn').disabled = false;
+        if (isUserCancelled) {
+            document.getElementById('statusMessage').style.display = 'none';
+        }
     }
 
     function showStatus(msg, type) {
         const msgEl = document.getElementById('statusMessage');
         msgEl.style.display = 'block';
         msgEl.innerText = msg;
+        
+        // 关键修复点：切换类型时全面清空先前生成的加载状态内联属性，防止其覆盖 CSS 类样式
+        msgEl.style.backgroundColor = '';
+        msgEl.style.color = '';
         msgEl.className = '';
+        
         if (type === "success") msgEl.classList.add('success');
         if (type === "error") msgEl.classList.add('error');
         if (type === "loading") {
